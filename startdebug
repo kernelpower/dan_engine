@@ -1,0 +1,7 @@
+g++ test.cpp -o ../bin/test
+if (( $? ));
+then
+echo "编译出现错误，调试中止！"
+else
+../bin/test
+fi
