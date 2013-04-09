@@ -41,6 +41,5 @@ int main(int argc, char * argv[])
     std::locale::global(std::locale("zh_CN.utf8"));
 
     task t1(L"t1");
-    cout << "hello linux!" << endl;
     return 0;
 }
