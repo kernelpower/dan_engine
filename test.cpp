@@ -3,7 +3,7 @@
 #include <locale>
 
 using namespace std;
-using namespace dan_engine::ai::bts;
+using namespace dan_ai::bts;
 
 class test_entity
 {
