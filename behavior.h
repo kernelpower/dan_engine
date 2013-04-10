@@ -89,7 +89,8 @@ namespace dan_ai
         {
         public:
             typedef shared_ptr < behavior_base < ENTITY_TYPE > > safe_behavior_ptr;
-            
+            typedef typename std::vector < safe_behavior_ptr > children_vector;
+
             composite(void) : behavior_base <ENTITY_TYPE> () {}
             composite(const wstring & node_name) : behavior_base < ENTITY_TYPE > (node_name) {}
             virtual ~composite(void) {}
@@ -102,11 +103,42 @@ namespace dan_ai
             }
 
         protected:
-            typedef std::vector < safe_behavior_ptr > children_vector;
             children_vector & children(void) { return _children; }
 
         private:
             children_vector _children;
+        };
+
+        // 选择结点
+        template < typename ENTITY_TYPE >
+        class selector : public composite < ENTITY_TYPE >
+        {
+        public:
+            selector(void) : composite < ENTITY_TYPE > () {}
+            selector(const wstring & node_name) : composite < ENTITY_TYPE > (node_name) {}
+            virtual ~selector(void) {}
+
+            typedef shared_ptr < behavior_base < ENTITY_TYPE > > safe_behavior_ptr;
+            typedef typename std::vector < safe_behavior_ptr > children_vector;
+
+            virtual behavior_result update(ENTITY_TYPE & entity)
+            {
+                if ( !evaluate(entity) )
+                    return bh_failure;
+
+                children_vector v1;
+                typedef typename children_vector::iterator children_iterator;
+
+                for ( children_iterator iter = children().begin();
+                    iter != children().end();
+                    iter++)
+                {
+                    
+                }
+                
+
+                return bh_failure;
+            }
         };
     }
 }
