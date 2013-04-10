@@ -83,6 +83,30 @@ namespace dan_ai
                     wstring					_name;
             };
 
-        // 
+        // 组合结点
+        template < typename ENTITY_TYPE >
+        class composite : public behavior_base < ENTITY_TYPE >
+        {
+        public:
+            typedef shared_ptr < behavior_base < ENTITY_TYPE > > safe_behavior_ptr;
+            
+            composite(void) : behavior_base <ENTITY_TYPE> () {}
+            composite(const wstring & node_name) : behavior_base < ENTITY_TYPE > (node_name) {}
+            virtual ~composite(void) {}
+
+            virtual behavior_result update(ENTITY_TYPE & entity) = 0;
+
+            void add_child(behavior_base < ENTITY_TYPE > * child_node)
+            {
+                children().push_back(safe_behavior_ptr(child_node));
+            }
+
+        protected:
+            typedef std::vector < safe_behavior_ptr > children_vector;
+            children_vector & children(void) { return _children; }
+
+        private:
+            children_vector _children;
+        };
     }
 }
