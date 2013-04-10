@@ -32,7 +32,7 @@ namespace dan_ai
                     condition(void) {}
                     virtual ~condition(void) {}
 
-                    virtual bool evaluate(const ENTITY_TYPE & entity) = 0;
+                    virtual bool evaluate(const ENTITY_TYPE & entity) const = 0;
             };
 
         // 基本行为（抽象类）
@@ -118,24 +118,23 @@ namespace dan_ai
             selector(const wstring & node_name) : composite < ENTITY_TYPE > (node_name) {}
             virtual ~selector(void) {}
 
-            typedef shared_ptr < behavior_base < ENTITY_TYPE > > safe_behavior_ptr;
-            typedef typename std::vector < safe_behavior_ptr > children_vector;
+            typedef typename composite<ENTITY_TYPE>::children_vector::iterator children_iterator;
+            using composite<ENTITY_TYPE>::children;
 
             virtual behavior_result update(ENTITY_TYPE & entity)
             {
                 if ( !evaluate(entity) )
                     return bh_failure;
 
-                children_vector v1;
-                typedef typename children_vector::iterator children_iterator;
 
                 for ( children_iterator iter = children().begin();
                     iter != children().end();
                     iter++)
                 {
-                    
+                    behavior_result result = (*iter)->execute(entity);
+                    if (result != bh_failure)
+                        return result;
                 }
-                
 
                 return bh_failure;
             }
