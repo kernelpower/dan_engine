@@ -22,6 +22,12 @@ class range_condition : public condition < test_entity >
 public:
     range_condition(int min, int max) : _min(min), _max(max)
     {
+        wcout << L"range condtion (" << this->min() << ", " << this->max() << ") construct." << endl;
+    }
+
+    virtual ~range_condition(void)
+    {
+        wcout << L"range condtion (" << this->min() << ", " << this->max() << ") de-construct." << endl;
     }
 
     bool in_range(int value) const
@@ -31,6 +37,8 @@ public:
 
     bool evaluate(const test_entity & entity) const
     {
+        wcout << L"range condition evaluate " << entity.count() << L" in (";
+        wcout << this->min() << L", " << this->max() << L")?" << endl;
         return in_range(entity.count());
     }
 
@@ -63,28 +71,20 @@ public:
     
     virtual	behavior_result update(test_entity & entity)
     {
-        entity.count()++;
-
-        wcout << name() << L" -> count: " << entity.count() << endl;
-
-        if ( entity.count() % 17 == 0 )
-        {
-            return bh_success;
-        }
-        
-        return bh_failure;
+        wcout << name() << L" update, count = " << entity.count() << endl;
+        return bh_success;
     }
 };
 
 class test_selector : public selector < test_entity >
 {
 public:
-    test_selector(void) : selector < test_entity > (), _tick(0)
+    test_selector(void) : selector < test_entity > ()
     {
         wcout << name() << " construct" << endl;
     }
 
-    test_selector(const wstring & node_name) : selector < test_entity > (node_name), _tick(0)
+    test_selector(const wstring & node_name) : selector < test_entity > (node_name)
     {
         wcout << name() << " construct" << endl;
     }
@@ -96,17 +96,9 @@ public:
 
     virtual behavior_result update(test_entity & entity)
     {
-        wcout << name() << L" tick " << tick() << endl;
         behavior_result result = selector<test_entity>::update(entity);
-        tick()++;
         return result;
     }
-public:
-    int     tick(void) const { return _tick; }
-    int &   tick(void) { return _tick; }
-
-private:
-    int _tick;
 };
 
 int main(int argc, char * argv[])
@@ -114,11 +106,25 @@ int main(int argc, char * argv[])
     std::locale::global(std::locale("zh_CN.utf8"));
 
     test_selector root(L"root");
-    root.add_child(new task(L"t1"));
-    root.add_child(new task(L"t2"));
-    root.add_child(new task(L"t3"));
+    typedef shared_ptr < behavior_base < test_entity > > safe_behavior_ptr;
+
+    safe_behavior_ptr & t1 =
+        root.add_child(new task(L"t1"));
+    
+    t1->set_condition(new range_condition(2, 7));
+
+    root.add_child(new task(L"t2"))->set_condition(new range_condition(8, 11));
+    root.add_child(new task(L"t3"))->set_condition(new range_condition(12, 35));
 
     test_entity t;
-    while(root.execute(t) != bh_success);
+    wstring result;
+
+    while(t.count() < 37)
+    {
+        bts_util::get_result_desc(result, root.execute(t));
+
+        wcout << L"tick: " << t.count() << L", result = " << result << endl;
+        t.count()++;
+    }
     return 0;
 }

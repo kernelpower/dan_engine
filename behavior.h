@@ -13,16 +13,45 @@ namespace dan_ai
         enum behavior_result
         {
             // 就绪
-            bh_ready,
+            bh_ready = 0,
 
             // 行为符合条件，并成功执行。
-            bh_success,
+            bh_success = 1,
 
             // 行为不符合条件。
-            bh_failure,
+            bh_failure = -1,
 
             // 行为正在运行中
-            bh_running,
+            bh_running = 2,
+        };
+
+        class bts_util
+        {
+        public:
+            static void get_result_desc(wstring & desc_text, behavior_result result)
+            {
+                switch(result)
+                {
+                case bh_ready:
+                    desc_text = L"ready";
+                    break;
+                
+                case bh_success:
+                    desc_text = L"success";
+                    break;
+                
+                case bh_failure:
+                    desc_text = L"failure";
+                    break;
+                
+                case bh_running:
+                    desc_text = L"running";
+                    break;
+                
+                default:
+                    desc_text = L"unknown";
+                }
+            }
         };
 
         template < typename ENTITY_TYPE >
@@ -62,6 +91,11 @@ namespace dan_ai
                         return update(entity);
                     }
 
+                    void set_condition(condition < ENTITY_TYPE > * new_condition)
+                    {
+                        _precondition = condition_ptr(new_condition);
+                    }
+        
                 protected:
                     virtual	behavior_result update(ENTITY_TYPE & entity) = 0;
 
@@ -97,9 +131,10 @@ namespace dan_ai
 
             virtual behavior_result update(ENTITY_TYPE & entity) = 0;
 
-            void add_child(behavior_base < ENTITY_TYPE > * child_node)
+            safe_behavior_ptr & add_child(behavior_base < ENTITY_TYPE > * child_node)
             {
                 children().push_back(safe_behavior_ptr(child_node));
+                return children().back();
             }
 
         protected:
