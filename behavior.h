@@ -268,7 +268,7 @@ namespace dan_ai
             }
 
         private:
-            int _current_index;
+            unsigned int _current_index;
        };
     }
 }
