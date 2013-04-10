@@ -10,7 +10,7 @@ namespace dan_ai
 {
     namespace bts
     {
-        enum behavior_result
+        enum behavior_state
         {
             // 就绪
             bh_ready = 0,
@@ -28,7 +28,7 @@ namespace dan_ai
         class bts_util
         {
         public:
-            static void get_result_desc(wstring & desc_text, behavior_result result)
+            static void get_result_desc(wstring & desc_text, behavior_state result)
             {
                 switch(result)
                 {
@@ -66,56 +66,103 @@ namespace dan_ai
 
         // 基本行为（抽象类）
         template < typename ENTITY_TYPE >
-            class behavior_base
+        class behavior_base
+        {
+        public:
+            behavior_base(void)
+                : _name(L"")
+                , _state(bh_ready)
+                , _precondition(static_cast< condition < ENTITY_TYPE > * > (0))
             {
-                public:
-                    behavior_base(void)
-                        : _name(L"")
-                          , _precondition(static_cast< condition < ENTITY_TYPE > * > (0))
+            }
+
+            behavior_base(const wstring & node_name)
+                : _name(node_name)
+                , _state(bh_ready)
+                , _precondition(static_cast< condition < ENTITY_TYPE > * > (0))
+            {
+            }
+
+            virtual ~behavior_base(void) {}
+
+            virtual	behavior_state execute(ENTITY_TYPE & entity)
+            {
+                if(state() == bh_success || state() == bh_failure)
                 {
+                    _description = L"";
+                    _state = bh_ready;
                 }
 
-                    behavior_base(const wstring & node_name)
-                        : _name(node_name)
-                          , _precondition(static_cast< condition < ENTITY_TYPE > * > (0))
+                if (!evaluate(entity))
                 {
+                    notify_failure(L"evaluate failed!");
+                    return state();
                 }
 
-                    virtual ~behavior_base(void) {}
+                if (state() == bh_ready)
+                {
+                    init(entity);
+                    _state = bh_running;
+                }
 
-                    virtual	behavior_result execute(ENTITY_TYPE & entity)
-                    {
-                        if (!evaluate(entity))
-                            return bh_failure;
+                update(entity);
 
-                        return update(entity);
-                    }
+                if(state() == bh_success || state() == bh_failure)
+                {
+                    done(entity);
+                }
 
-                    void set_condition(condition < ENTITY_TYPE > * new_condition)
-                    {
-                        _precondition = condition_ptr(new_condition);
-                    }
+                return state();
+            }
+
+            void set_condition(condition < ENTITY_TYPE > * new_condition)
+            {
+                _precondition = condition_ptr(new_condition);
+            }
         
-                protected:
-                    virtual	behavior_result update(ENTITY_TYPE & entity) = 0;
+        protected:
+            virtual	void init(ENTITY_TYPE & entity) {}
+            virtual void update(ENTITY_TYPE & entity) = 0;
+            virtual	void done(ENTITY_TYPE & entity) {}
 
-                    virtual bool evaluate(ENTITY_TYPE & entity) const
-                    {
-                        if (precondition() == 0)
-                            return true;
+            virtual bool evaluate(ENTITY_TYPE & entity) const
+            {
+                if (precondition() == 0)
+                    return true;
 
-                        return (*precondition()).evaluate(entity);
-                    }
+                return (*precondition()).evaluate(entity);
+            }
 
-                public:
-                    typedef shared_ptr < condition < ENTITY_TYPE > > condition_ptr;
-                    const condition_ptr & precondition(void) const { return _precondition; }
-                    const wstring & name(void) const { return _name; }
+            void notify_success(const wstring & message)
+            {
+                _description = message;
+                _state = bh_success;
+            }
 
-                private:
-                    condition_ptr           _precondition;
-                    wstring					_name;
-            };
+            void notify_success(void)
+            {
+                notify_success(L"");
+            }
+
+            void notify_failure(const wstring & message)
+            {
+                _description = message;
+                _state = bh_failure;
+            }
+
+        public:
+            typedef shared_ptr < condition < ENTITY_TYPE > > condition_ptr;
+            const condition_ptr & precondition(void) const { return _precondition; }
+            const wstring & name(void) const { return _name; }
+            behavior_state state(void) const { return _state; }
+            const wstring & description(void) const { return _description; }
+
+        protected:
+            condition_ptr           _precondition;
+            wstring					_name;
+            behavior_state          _state;
+            wstring                 _description;
+        };
 
         // 组合结点
         template < typename ENTITY_TYPE >
@@ -129,7 +176,7 @@ namespace dan_ai
             composite(const wstring & node_name) : behavior_base < ENTITY_TYPE > (node_name) {}
             virtual ~composite(void) {}
 
-            virtual behavior_result update(ENTITY_TYPE & entity) = 0;
+            virtual void update(ENTITY_TYPE & entity) = 0;
 
             safe_behavior_ptr & add_child(behavior_base < ENTITY_TYPE > * child_node)
             {
@@ -154,25 +201,74 @@ namespace dan_ai
             virtual ~selector(void) {}
 
             typedef typename composite<ENTITY_TYPE>::children_vector::iterator children_iterator;
+
             using composite<ENTITY_TYPE>::children;
+            using composite<ENTITY_TYPE>::notify_failure;
+            using composite<ENTITY_TYPE>::notify_success;
 
-            virtual behavior_result update(ENTITY_TYPE & entity)
+            virtual void update(ENTITY_TYPE & entity)
             {
-                if ( !evaluate(entity) )
-                    return bh_failure;
-
-
                 for ( children_iterator iter = children().begin();
                     iter != children().end();
                     iter++)
                 {
-                    behavior_result result = (*iter)->execute(entity);
-                    if (result != bh_failure)
-                        return result;
+                    behavior_state result = (*iter)->execute(entity);
+                    if (result == bh_success)
+                    {
+                        notify_success((*iter)->description());
+                        return;
+                    }
+                    else if (result == bh_running)
+                    {
+                        return;
+                    }
                 }
 
-                return bh_failure;
+                notify_failure(L"all of children were failed!");
             }
-        };
+       };
+
+        // 序列结点
+        template < typename ENTITY_TYPE >
+        class sequence : public composite < ENTITY_TYPE >
+        {
+        public:
+            sequence(void) : composite < ENTITY_TYPE > () {}
+            sequence(const wstring & node_name) : composite < ENTITY_TYPE > (node_name) {}
+            virtual ~sequence(void) {}
+
+            typedef typename composite<ENTITY_TYPE>::safe_behavior_ptr children_iterator;
+            using composite<ENTITY_TYPE>::children;
+            using composite<ENTITY_TYPE>::notify_failure;
+            using composite<ENTITY_TYPE>::notify_success;
+
+            virtual	void init(ENTITY_TYPE & entity)
+            {
+                _current_index = 0;
+            }
+
+            virtual void update(ENTITY_TYPE & entity)
+            {
+                if (children().size() == 0)
+                {
+                    notify_failure(L"none of children!");
+                    return;
+                }
+                
+                children_iterator & child = children()[_current_index];
+                behavior_state child_state = child->execute(entity);
+                
+                if (child_state != bh_running)
+                    _current_index++;
+
+                if (_current_index >= children().size())
+                {
+                    notify_success();
+                }                
+            }
+
+        private:
+            int _current_index;
+       };
     }
 }

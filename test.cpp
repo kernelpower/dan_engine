@@ -51,28 +51,61 @@ private:
     int _max;
 };
 
-class task : public behavior_base < test_entity >
+class range_task : public behavior_base < test_entity >
 {
 public:
-    task(void) : behavior_base()
+    range_task(void) : behavior_base()
     {
         wcout << name() << " construct" << endl;
     }
     
-    task(const wstring & node_name) : behavior_base(node_name)
+    range_task(const wstring & node_name) : behavior_base(node_name)
     {
         wcout << name() << " construct" << endl;
     }
     
-    virtual ~task(void)
+    virtual ~range_task(void)
     {
         wcout << name() << " de-construct" << endl;
     }
     
-    virtual	behavior_result update(test_entity & entity)
+    void update(test_entity & entity)
     {
         wcout << name() << L" update, count = " << entity.count() << endl;
-        return bh_success;
+        notify_success();
+    }
+};
+
+class mod_task : public behavior_base < test_entity >
+{
+public:
+    mod_task(void) : behavior_base()
+    {
+        wcout << name() << " construct" << endl;
+    }
+    
+    mod_task(const wstring & node_name) : behavior_base(node_name)
+    {
+        wcout << name() << " construct" << endl;
+    }
+    
+    virtual ~mod_task(void)
+    {
+        wcout << name() << " de-construct" << endl;
+    }
+    
+    void update(test_entity & entity)
+    {
+        wcout << "mod get " << entity.count() << endl;
+        if (entity.count() % 5 == 0)
+        {
+            wcout << "mod success with" << entity.count() << endl;
+            notify_success();
+        }
+        else if (entity.count() % 5 > 2)
+        {
+            notify_failure(L"too large!");
+        }
     }
 };
 
@@ -94,10 +127,33 @@ public:
         wcout << name() << " de-construct" << endl;
     }
 
-    virtual behavior_result update(test_entity & entity)
+    void update(test_entity & entity)
     {
-        behavior_result result = selector<test_entity>::update(entity);
-        return result;
+        selector<test_entity>::update(entity);
+    }
+};
+
+class test_sequence : public sequence < test_entity >
+{
+public:
+    test_sequence(void) : sequence < test_entity > ()
+    {
+        wcout << name() << " construct" << endl;
+    }
+
+    test_sequence(const wstring & node_name) : sequence < test_entity > (node_name)
+    {
+        wcout << name() << " construct" << endl;
+    }
+
+    virtual ~test_sequence(void)
+    {
+        wcout << name() << " de-construct" << endl;
+    }
+
+    void update(test_entity & entity)
+    {
+        sequence<test_entity>::update(entity);
     }
 };
 
@@ -106,24 +162,22 @@ int main(int argc, char * argv[])
     std::locale::global(std::locale("zh_CN.utf8"));
 
     test_selector root(L"root");
-    typedef shared_ptr < behavior_base < test_entity > > safe_behavior_ptr;
 
-    safe_behavior_ptr & t1 =
-        root.add_child(new task(L"t1"));
-    
-    t1->set_condition(new range_condition(2, 7));
-
-    root.add_child(new task(L"t2"))->set_condition(new range_condition(8, 11));
-    root.add_child(new task(L"t3"))->set_condition(new range_condition(12, 35));
+    root.add_child(new range_task(L"t1"))->set_condition(new range_condition(2, 7));
+    root.add_child(new mod_task(L"mod"));
+    root.add_child(new range_task(L"t2"))->set_condition(new range_condition(8, 12));
+    root.add_child(new range_task(L"t3"))->set_condition(new range_condition(13, 15));
 
     test_entity t;
     wstring result;
 
-    while(t.count() < 37)
+    while(t.count() < 19)
     {
         bts_util::get_result_desc(result, root.execute(t));
 
-        wcout << L"tick: " << t.count() << L", result = " << result << endl;
+        wcout << L"tick: " << t.count() << L", result = " << result;
+        //wcout << L", desc = " << root.description();
+        wcout << endl << endl;
         t.count()++;
     }
     return 0;
